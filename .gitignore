@@ -147,7 +147,8 @@ notebooks/gifs/
 *.txt
 *.csv
 lightning_logs/
-runs/
+runs/git remote add origin <url>
 multirun/
 
 *.ini
+config.py
