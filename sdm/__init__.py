@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Initialize the config when the package is imported
 config = configparser.ConfigParser()
-default_config_path = Path(__file__).parent / "config.ini"
+default_config_path = Path(__file__).parent.parent / "config.ini"
 config.read(default_config_path)
 
 try:

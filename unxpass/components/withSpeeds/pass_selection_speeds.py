@@ -244,10 +244,12 @@ class SoccerMapComponent(PassSelectionComponent, UnxPassPytorchComponent):
         super().__init__(
             model=model,
             features={
-                "startlocation": ["start_x_a0", "start_y_a0"],
-                "endlocation": ["end_x_a0", "end_y_a0"],
-                "speed": ["speedx_a02", "speedy_a02"],
-                "freeze_frame_360": ["freeze_frame_360_a0"],
+                "player_freeze_frame_reception": ["player_freeze_frame_reception"],
+                "player_freeze_frame": ["player_freeze_frame"],
+                "ball_freeze_frame": ["ball_freeze_frame_x", "ball_freeze_frame_y", 
+                                      "ball_freeze_frame_x_velo", "ball_freeze_frame_y_velo"],
+                "ball_freeze_frame_reception": ["ball_freeze_frame_reception_x", "ball_freeze_frame_reception_y"],
+
             },
             label=["success"],  # just a dummy lalel
             transform=ToSoccerMapTensor(dim=(68, 104)),

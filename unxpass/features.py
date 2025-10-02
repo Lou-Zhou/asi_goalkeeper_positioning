@@ -874,6 +874,9 @@ def pass_options(gamestates):
     ).set_index(["game_id", "action_id"])
 
 
+
+
+
 defenders_in_3m_radius = required_fields(
     ["start_x", "start_y", "end_x", "end_y", "freeze_frame_360"]
 )(fs.simple(partial(_defenders_in_radius, radius=3)))
@@ -929,7 +932,16 @@ all_features = [
     defenders_in_3m_radius,
     defenders_in_5m_radius,
 ]
+def player_freeze_frame_reception():
+    pass
 
+def player_freeze_frame():
+    pass
+
+def ball_freeze_frame():
+    pass 
+def ball_freeze_frame_reception():
+    pass
 
 def get_features(
     db: Database,

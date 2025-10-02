@@ -2,6 +2,8 @@
 from pathlib import Path
 from functools import partial
 import matplotlib.pyplot as plt
+import sys
+sys.path.append(str(Path("..").resolve() / ".."))
 from unxpass.config import logger
 import mlflow
 import tempfile
@@ -19,12 +21,12 @@ from sdm import path_data, path_repo
 
 # Handle file paths ----
 
-path_db = path_data + "/Bundesliga/buli_all.sql"
+# path_db = path_data + "/Bundesliga/buli_all.sql"
 path_config = path_repo + "/config/"
-STORES_FP = Path("../stores")
+# STORES_FP = Path("../stores")
 
 
-db = SQLiteDatabase(path_db)
+# db = SQLiteDatabase(path_db)
 
 overrides = ["experiment=pass_selection/soccermap"]
 cfg = __main__.parse_config(config_path=path_config, overrides = overrides)
@@ -32,7 +34,7 @@ train_cfg = OmegaConf.to_object(cfg.get("train_cfg", DictConfig({})))
 utils.instantiate_callbacks(train_cfg)
 utils.instantiate_loggers(train_cfg)
 
-custom_path = path_data + "/Bundesliga/features/features_angle"
+custom_path = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/feats"
 dataset_train = partial(PassesDataset, path=custom_path)
 logger.info("Starting training!")
 pass_selection_model = hydra.utils.instantiate(cfg["component"], _convert_="partial")
