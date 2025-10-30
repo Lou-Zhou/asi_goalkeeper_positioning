@@ -24,7 +24,7 @@ def get_threat(row: pd.Series, xthreat : np.array) -> np.float64:
     Parameters
     ----------
         row: pd.Series
-            The row defining a player possession
+            The row defining a player possession and tracking
         xthreat: np.array
             A numpy array defining the xthreat surface
     
@@ -33,30 +33,33 @@ def get_threat(row: pd.Series, xthreat : np.array) -> np.float64:
         np.float
             The threat at the start location of the player possession
     """
-    start_x = int((row['x_start'] + 52.5) / 8.75)
-    start_y = int((row['y_start'] + 34) / 8.5)
+    ball_frame = literal_eval(row['ball_data'])
+    if ball_frame['x'] is None or ball_frame['y'] is None:
+        return 0
+    start_x = int((ball_frame['x'] + 52.5) / 8.75)
+    start_y = int((ball_frame['y'] + 34) / 8.5)
+    if not row['correct_orient']:
+        start_x = start_x * -1
     clipped_x = np.clip(start_x, 0, 11)
     clipped_y = np.clip(start_y, 0, 7)
     return xthreat[clipped_y, clipped_x]
 
-def get_freeze_frame(frame_id : int, tracking : pd.DataFrame,
+def get_freeze_frame(ball_dict: str, player_dict: str,
                      player_map : Dict[int, List[int]], team : int,
-                     receiver : int, switch : int) -> Tuple[Dict[str, str | float]]:
+                     switch : int) -> Tuple[Dict[str, str | float]]:
     """
     Builds both the ball and player freeze frames at a specific frame
 
     Parameters
     ----------
-        frame_id: int
-            The frame of interest
-        tracking: pd.DataFrame
-            The tracking dataframe
+        ball_dict: str  
+            A dictionary in raw string form describing the ball data at a specific frame
+        player_dict: str
+            A dictionary in raw string form describing the player data at a specific frame
         player_map: Dict[int, int]
             A dictionary mapping the team to 
         team: int
             The team_id in possession
-        receiver: int
-            The player_id of the receiver of the ball possession
         switch: int
             A boolean-like integer(1 or -1) that determines whether or not the 
             coordinates need to be flipped to ensure left-to-right 
@@ -66,21 +69,31 @@ def get_freeze_frame(frame_id : int, tracking : pd.DataFrame,
         A tuple of dictionaries which describe the 
         freeze frame for both the ball and the players
     """
-    tracking_frame = tracking[tracking['frame'] == frame_id].iloc[0]
-    ball_data = literal_eval(tracking_frame['ball_data'])
-    player_data = literal_eval(tracking_frame['player_data'])
+    ball_data = literal_eval(ball_dict)
+    player_data = literal_eval(player_dict)
+    other_team = (set(player_map) - {team}).pop()
     for player in player_data:
+        player['x'] += 52.5
+        player['y'] += 34
         if switch:
-            player['x'] = player['x'] * -1
+            player['x'] = 105 - player['x']
         player['in_possession'] = any(player['player_id'] == poss_player[0]
                                       for poss_player in player_map[team])
         player['opp_gk'] = any((player['player_id'] == poss_player[0]) and (0 == poss_player[1])
-                               for poss_player in player_map[team])
-        player['receiver'] = any(player['player_id'] == receiver
-                                for _ in player_map[team])
+                               for poss_player in player_map[other_team])
+
+    ball_data['x'] += 52.5
+    ball_data['y'] += 34
     if switch:
-        ball_data['x'] = ball_data['x'] * -1
+        ball_data['x'] = 105 - ball_data['x']
     return player_data, ball_data
+
+def get_specific_player(ff : Dict[str, Union[str | float]], col_name : str):
+    """ Gets a specific player from a freeze frame"""
+    player_list = [player for player in ff if player[col_name]]
+    if len(player_list) == 0:
+        raise KeyError("No Such Player Found in Freeze Frame")
+    return player_list[0]
 
 def get_player_speeds(ref_ff : Dict[str, Union[str | float]],
                       new_ff : Dict[str, Union[str | float]],
@@ -108,8 +121,8 @@ def get_player_speeds(ref_ff : Dict[str, Union[str | float]],
         old_player = [old_frame for old_frame in ref_ff
                       if old_frame['player_id'] == player['player_id']]
         if len(old_player) == 0:
-            player['x_speed'] = None
-            player['y_speed'] = None
+            player['x_velo'] = 0
+            player['y_velo'] = 0 #just say he isn't moving if we don't have the data
             continue
         new_loc = [player['x'], player['y']]
         old_player = old_player[0]
@@ -143,6 +156,25 @@ def get_ball_speeds(ref_ff : Dict[str, Union[str | float]],
     new_ff['y_velo'] = (new_ff['y'] - ref_ff['y']) / (frame_diff * 0.1) * flip
     return new_ff
 
+def check_na(row : pd.Series, na_frames : set) -> pd.DataFrame:
+    """
+    Row level function determining if the frame and the corresponding event contains NAs between
+    Parameters
+    ----------
+        row : pd.Series
+            A row describing a frame of interest
+        na_frames : set
+            A set of frames which correspond to NA values
+    Returns
+    -------
+        A new value describing whether or not there is an NA between the frame 
+        and its corresponding event
+
+    """
+    frame_range = range(int(row['frame_start']), int(row['frame'] + 1))
+    intersection = set(frame_range).intersection(na_frames)
+    return len(intersection) > 0
+
 def get_player_map(match_id : int, metadata : pd.Series) -> Dict[int, List[int]]:
     """
     Builds map between teams and players
@@ -163,25 +195,6 @@ def get_player_map(match_id : int, metadata : pd.Series) -> Dict[int, List[int]]
     return {literal_eval(match_meta[f'{team}_team'])['id'] : team_list
             for team, team_list in zip(['home', 'away'], team_list)}
 
-def find_invalid_frames(prev_frame : int, pres_frame : int, tracking : pd.DataFrame) -> int:
-    """Finds the number of invalid frames in a frame range"""
-    tracking_frames = tracking[tracking['frame'].isin(range(int(prev_frame), int(pres_frame) + 1))]
-    tracking_frames['ball_data'] = tracking_frames['ball_data'].apply(literal_eval)
-    return find_missing_frames(tracking_frames) + find_outofbound_frames(tracking_frames)
-
-def find_outofbound_frames(tracking_frames : pd.DataFrame) -> int:
-    """Finds the number of frames where the ball is out of bounds""" 
-    tracking_frames['tracking_x'] = tracking_frames['ball_data'].apply(lambda x: x['x'])
-    tracking_frames['tracking_y'] = tracking_frames['ball_data'].apply(lambda x: x['y'])
-
-    oob_mask = ((tracking_frames['tracking_x'] > 52.5) | (tracking_frames['tracking_x'] < -52.5) |
-                (tracking_frames['tracking_y'] > 34) | (tracking_frames['tracking_y'] < -34))
-    return tracking_frames[oob_mask].shape[0]
-
-def find_missing_frames(tracking_frames: pd.DataFrame) -> int:
-    """Finds the number of frames where there is no tracking data found"""
-    num_missing = tracking_frames[tracking_frames['player_data'] == '[]'].shape[0]
-    return num_missing
 
 
 def generate_feats(match_id : int, xthreat : np.array) -> pd.DataFrame:
@@ -192,46 +205,48 @@ def generate_feats(match_id : int, xthreat : np.array) -> pd.DataFrame:
         "/home/lz80/rdf/sp161/shared/asi_gk_pos/data/matches_meta.csv")
     tracking = pd.read_csv(
         f"/home/lz80/rdf/sp161/shared/asi_gk_pos/data/tracking/{match_id}_tracking.csv")
-
+    missing_data_frames = set(tracking[tracking['player_data'] == '[]']['frame'])
     possessions = event_data[event_data['event_type'] == "player_possession"].copy()
-    possessions['prev_frame'] = possessions['frame_end'].shift(1)
+    possessions = possessions[['match_id','frame_start', 'attacking_side', 'team_id', 'player_id']]
+    tracking = tracking[tracking['player_data'] != '[]'].copy()
+    tracking = pd.merge_asof(tracking, possessions,
+                        left_on = "frame", right_on = "frame_start", direction='backward')
+    tracking['5_frames_ahead'] = tracking['frame'] + 5
+    tracking = pd.merge(tracking, tracking, left_on = "5_frames_ahead", right_on = "frame",
+                        suffixes = (None, "_5ahead"))
 
-    possessions['correct_orient'] = possessions['attacking_side'] == 'left_to_right'
-    possessions['xT'] = possessions.apply(lambda x: get_threat(x, xthreat), axis=1)
+    tracking['correct_orient'] = tracking['attacking_side'] == 'left_to_right'
+    tracking['xT'] = tracking.apply(lambda row: get_threat(row, xthreat), axis=1)
 
-    possessions = possessions[~possessions['start_type'].isin(
-        ['free_kick_reception', 'throw_in_reception',
-        'goal_kick_reception', 'corner_reception'])]
-    threatening = possessions[(possessions['xT'] >= .04)]
-    threatening = threatening[threatening['prev_frame'] != threatening['frame_end']]
+    threatening = tracking[(tracking['xT'] >= .08)].copy()
+    threatening['has_na'] = threatening.apply(lambda row: check_na(row,
+                                                                   missing_data_frames), axis = 1)
+    threatening = threatening[~threatening['has_na']]
     player_map = get_player_map(match_id, metadata)
 
-    threatening['invalid_count'] = threatening.apply(lambda x:
-            find_invalid_frames(x['prev_frame'], x['frame_start'], tracking), axis = 1)
-    no_missing = threatening[threatening['invalid_count'] == 0].copy()
-    no_missing[['player_freeze_frame', 'ball_freeze_frame']] = no_missing.apply(
-        lambda x: get_freeze_frame(x['prev_frame'], tracking, player_map,
-            x['team_id'],x['player_id'],  not x['correct_orient']), axis = 1, result_type="expand")
 
-    no_missing[['player_freeze_frame_5forward', 'ball_freeze_frame_5forward']] = no_missing.apply(
-        lambda x: get_freeze_frame(x['prev_frame'] + 5, tracking, player_map,
-            x['team_id'], x['player_id'], not x['correct_orient']), axis = 1, result_type="expand")
+    threatening[['player_freeze_frame_5forward', 'ball_freeze_frame_5forward']] = threatening.apply(
+        lambda x: get_freeze_frame(x['ball_data_5ahead'], x['player_data_5ahead'], player_map,
+            x['team_id'], not x['correct_orient']), axis = 1, result_type="expand")
 
-    no_missing[['player_freeze_frame_reception', 'ball_freeze_frame_reception']] = no_missing.apply(
-        lambda x: get_freeze_frame(x['frame_start'], tracking, player_map,
-            x['team_id'],x['player_id'], not x['correct_orient']), axis = 1, result_type = "expand")
+    threatening[['player_freeze_frame', 'ball_freeze_frame']] = threatening.apply(
+        lambda x: get_freeze_frame(x['ball_data'], x['player_data'],  player_map,
+            x['team_id'], not x['correct_orient']), axis = 1, result_type = "expand")
 
-    no_missing['player_freeze_frame'] = no_missing.apply(
+    threatening['player_freeze_frame'] = threatening.apply(
         lambda x: get_player_speeds(x['player_freeze_frame_5forward'],
             x['player_freeze_frame'], 5, flip = -1), axis = 1)
 
-    no_missing['ball_freeze_frame'] = no_missing.apply(
+    threatening['ball_freeze_frame'] = threatening.apply(
         lambda x: get_ball_speeds(x['ball_freeze_frame_5forward'],
             x['ball_freeze_frame'], 5, flip = -1), axis = 1)
 
-    return no_missing[['event_id', 'match_id','player_freeze_frame',
-                    'player_freeze_frame_reception', 'ball_freeze_frame',
-                    'ball_freeze_frame_reception']]
+    threatening['gk_frame'] = threatening['player_freeze_frame'].apply(lambda x:
+                get_specific_player(x, "opp_gk"))
+
+
+    return threatening[['match_id', 'frame', 'player_freeze_frame', 'ball_freeze_frame',
+                        'gk_frame']]
 
 def build_parquet(df : pd.DataFrame, filepath : str) -> Literal[True]:
     """
@@ -248,10 +263,10 @@ def build_parquet(df : pd.DataFrame, filepath : str) -> Literal[True]:
         Literal[True]
             True if the parquets were able to be saved
     """
-    dict_feats = ['ball_freeze_frame', 'ball_freeze_frame_reception']
+    dict_feats = ['ball_freeze_frame', 'gk_frame']
     idx = pd.MultiIndex.from_tuples(
-                list(zip(df['event_id'], df['match_id'])),
-                names=["event_id", "match_id"]
+                list(zip(df['match_id'], df['frame'])),
+                names=["match_id", "frame"]
             )
 
     for feat in dict_feats:
@@ -263,13 +278,13 @@ def build_parquet(df : pd.DataFrame, filepath : str) -> Literal[True]:
         feat_df.index = idx
         feat_df.to_parquet(path)
 
-    non_dict_feats = ['player_freeze_frame', 'player_freeze_frame_reception']
+    non_dict_feats = ['player_freeze_frame']
     for feat in non_dict_feats:
         path = Path(filepath / f"x_{feat}.parquet")
         feat_df = df[feat]
         feat_df.index = idx
         feat_df.to_frame().to_parquet(path)
-    success_dummy = pd.Series(0, idx, name = "success")
+    success_dummy = pd.Series(True, idx, name = "success")
 
     success_dummy.to_frame().to_parquet(Path(filepath / "y_success.parquet"))
     return True
@@ -284,7 +299,7 @@ def main():
 
     game_ids = metadata['id']
     feature_dfs = []
-    for game_id in tqdm(game_ids[0:1]):
+    for game_id in tqdm(game_ids):
         feature_df = generate_feats(game_id, xthreat)
         feature_dfs.append(feature_df)
 

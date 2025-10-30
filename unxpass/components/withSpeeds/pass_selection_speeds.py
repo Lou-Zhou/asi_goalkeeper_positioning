@@ -51,7 +51,7 @@ class PytorchSoccerMapModel(pl.LightningModule):
         # it also allows to access params with 'self.hparams' attribute
         self.save_hyperparameters()
 
-        self.model = SoccerMap(in_channels=12)
+        self.model = SoccerMap(in_channels=13)
         self.softmax = nn.Softmax(2)
 
         # loss function
@@ -64,7 +64,10 @@ class PytorchSoccerMapModel(pl.LightningModule):
 
     def step(self, batch: Any):
         x, mask, y = batch
+
+        #print(torch.nonzero(torch.isnan(x)))
         surface = self.forward(x)
+
         y_hat = pixel(surface, mask)
         loss = self.criterion(y_hat, y)
         return loss, y_hat, y
@@ -131,30 +134,30 @@ class ToSoccerMapTensor:
         return x_bin, y_bin
 
     def __call__(self, sample):
-        start_x, start_y, end_x, end_y = (
-            sample["start_x_a0"],
-            sample["start_y_a0"],
-            sample["end_x_a0"],
-            sample["end_y_a0"],
-        )
-        speed_x, speed_y = sample["speedx_a02"], sample["speedy_a02"]
-        frame = pd.DataFrame.from_records(sample["freeze_frame_360_a0"])
+        
+        ball_x, ball_y = (sample['ball_freeze_frame_x'], sample['ball_freeze_frame_y'])
+        ball_x_velo, ball_y_velo = (sample['ball_freeze_frame_x_velo'], sample['ball_freeze_frame_y_velo'])
+        frame= pd.DataFrame.from_records(sample['player_freeze_frame'])
+        
 
-        # Location of the player that passes the ball
-        # passer_coo = frame.loc[frame.actor, ["x", "y"]].fillna(1e-10).values.reshape(-1, 2)
+        gk_x, gk_y = (sample['gk_frame_x'], sample['gk_frame_y'])
+
+
         # Location of the ball
-        ball_coo = np.array([[start_x, start_y]])
+        ball_coo = np.array([[ball_x, ball_y]])
         # Location of the goal
         goal_coo = np.array([[105, 34]])
+        
         # Locations of the passing player's teammates
-        players_att_coo = frame.loc[~frame.actor & frame.teammate, ["x", "y"]].values.reshape(
+        players_att_coo = frame.loc[frame.in_possession, ["x", "y"]].values.reshape(
             -1, 2
         )
         # Locations and speed vector of the defending players
-        players_def_coo = frame.loc[~frame.teammate, ["x", "y"]].values.reshape(-1, 2)
+        players_def_coo = frame.loc[~frame.in_possession & ~frame.opp_gk, ["x", "y"]].values.reshape(-1, 2)
 
+        
         # Output
-        matrix = np.zeros((12, self.y_bins, self.x_bins))#3D, 14 x 68 x 104
+        matrix = np.zeros((13, self.y_bins, self.x_bins))#3D, 14 x 68 x 104
 
         # CH 1: Locations of attacking team
         x_bin_att, y_bin_att = self._get_cell_indexes(
@@ -199,37 +202,37 @@ class ToSoccerMapTensor:
             np.arctan((y0_goal - coords[:, :, 1]) / (x0_goal - coords[:, :, 0]))
         )
 
-        # CH 8-9: Ball speed - taken out
-        #matrix[7, y0_ball, x0_ball] = speed_x
-        #matrix[8, y0_ball, x0_ball] = speed_y
+        # CH 8-9: Ball speed 
+        matrix[7, y0_ball, x0_ball] = ball_x_velo
+        matrix[8, y0_ball, x0_ball] = ball_y_velo
 
         # Get velocities
-        players_att_vx = frame.loc[~frame.actor & frame.teammate, "x_velo"].values  # shape: (n_att_players,)
-        players_att_vy = frame.loc[~frame.actor & frame.teammate, "y_velo"].values  # shape: (n_att_players,)
+        players_att_vx = frame.loc[frame.in_possession, "x_velo"].values  # shape: (n_att_players,)
+        players_att_vy = frame.loc[frame.in_possession, "y_velo"].values  # shape: (n_att_players,)
 
         # Similarly for defending players, using the correct condition (assuming defenders are non-teammates)
-        players_def_vx = frame.loc[~frame.teammate, "x_velo"].values  # shape: (n_def_players,)
-        players_def_vy = frame.loc[~frame.teammate, "y_velo"].values 
-        # Channels 8 and 9, attacking team velocities 
-        matrix[7, y_bin_att, x_bin_att] = players_att_vx
-        matrix[8, y_bin_att, x_bin_att] = players_att_vy
+        players_def_vx = frame.loc[~frame.in_possession & ~frame.opp_gk, "x_velo"].values  # shape: (n_def_players,)
+        players_def_vy = frame.loc[~frame.in_possession & ~frame.opp_gk, "y_velo"].values
+        # Channels 10 and 11, attacking team velocities 
+        matrix[9, y_bin_att, x_bin_att] = players_att_vx
+        matrix[10, y_bin_att, x_bin_att] = players_att_vy
 
-        # Channel 10 & 11: Defending player velocities (x and y)
-        matrix[9, y_bin_def, x_bin_def] = players_def_vx
-        matrix[10, y_bin_def, x_bin_def] = players_def_vy
+        #print(players_att_vx)
+        #print(players_att_vy)
+
+        # Channel 12 & 13: Defending player velocities (x and y)
+        matrix[11, y_bin_def, x_bin_def] = players_def_vx
+        matrix[12, y_bin_def, x_bin_def] = players_def_vy
+        #print(players_def_vx)
+        #print(players_def_vy)
         mask = np.zeros((1, self.y_bins, self.x_bins))
-        end_ball_coo = np.array([[end_x, end_y]])
-        if np.isnan(end_ball_coo).any():
+        end_gk_coo = np.array([[gk_x, gk_y]])
+        if np.isnan(end_gk_coo).any():
             raise ValueError("End coordinates not known.")
-        x0_ball_end, y0_ball_end = self._get_cell_indexes(end_ball_coo[:, 0], end_ball_coo[:, 1])
-        mask[0, y0_ball_end, x0_ball_end] = 1
-        if "receiver" in sample:
-            target = int(sample["receiver"]) if not math.isnan(sample["receiver"]) else -1
-            return (
-                torch.from_numpy(matrix).float(),
-                torch.from_numpy(mask).float(),
-                torch.tensor([target]).float(),
-            )
+        x0_gk_end, y0_gk_end = self._get_cell_indexes(end_gk_coo[:, 0], end_gk_coo[:, 1])
+
+        mask[0, y0_gk_end, x0_gk_end] = 1
+
         return (
             torch.from_numpy(matrix).float(),
             torch.from_numpy(mask).float(),
@@ -244,12 +247,10 @@ class SoccerMapComponent(PassSelectionComponent, UnxPassPytorchComponent):
         super().__init__(
             model=model,
             features={
-                "player_freeze_frame_reception": ["player_freeze_frame_reception"],
                 "player_freeze_frame": ["player_freeze_frame"],
                 "ball_freeze_frame": ["ball_freeze_frame_x", "ball_freeze_frame_y", 
                                       "ball_freeze_frame_x_velo", "ball_freeze_frame_y_velo"],
-                "ball_freeze_frame_reception": ["ball_freeze_frame_reception_x", "ball_freeze_frame_reception_y"],
-
+                "gk_frame": ['gk_frame_x', 'gk_frame_y'],
             },
             label=["success"],  # just a dummy lalel
             transform=ToSoccerMapTensor(dim=(68, 104)),

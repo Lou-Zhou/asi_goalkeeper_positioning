@@ -7,16 +7,10 @@ sys.path.append(str(Path("..").resolve() / ".."))
 from unxpass.config import logger
 import mlflow
 import tempfile
-from xgboost import XGBClassifier, XGBRanker
-from unxpass.databases import SQLiteDatabase
-from unxpass.datasets import PassesDataset
-from unxpass.components import pass_success
-from unxpass.components.withSpeeds import pass_selection_speeds
-from unxpass.components.utils import log_model, load_model
 from unxpass import __main__, utils
 from omegaconf import DictConfig, OmegaConf
 import hydra
-
+from unxpass.datasets import PassesDataset 
 from sdm import path_data, path_repo
 
 # Handle file paths ----
@@ -31,6 +25,7 @@ path_config = path_repo + "/config/"
 overrides = ["experiment=pass_selection/soccermap"]
 cfg = __main__.parse_config(config_path=path_config, overrides = overrides)
 train_cfg = OmegaConf.to_object(cfg.get("train_cfg", DictConfig({})))
+#train_cfg['batch_size'] = 1
 utils.instantiate_callbacks(train_cfg)
 utils.instantiate_loggers(train_cfg)
 
@@ -49,3 +44,4 @@ with mlflow.start_run() as run:
     run_id = run.info.run_id
     print(f"Pass Selection Model saved with run_id: {run_id}")
 logger.info("✅ Finished training. Model saved with ID %s", run.info.run_id)
+#2c3e51cd40e745bdbe846007f5245843

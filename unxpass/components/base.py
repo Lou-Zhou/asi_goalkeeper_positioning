@@ -245,14 +245,14 @@ class UnxPassPytorchComponent(UnxpassComponent):
             batch_size=batch_size,
             num_workers=num_workers,
             pin_memory=pin_memory,
-            shuffle=True,
+            shuffle=False, #true
         )
         val_dataloader = DataLoader(
             _data_val,
             batch_size=batch_size,
             num_workers=num_workers,
             pin_memory=pin_memory,
-            shuffle=True,
+            shuffle=False, #true
         )
 
         # Train the model
@@ -330,8 +330,8 @@ class UnxPassPytorchComponent(UnxpassComponent):
             # Load dataset
             data = self.initialize_dataset(dataset)
             actions = data.features.reset_index()
-            gameIndex = "game_id" if "game_id" in actions.columns else "match_id"  
-            actionIndex = "action_id" if "action_id" in actions.columns else "index"
+            gameIndex = "match_id" 
+            actionIndex = "frame"
 
             if game_id is not None:
                 actions = actions[actions[gameIndex] == game_id].reset_index()

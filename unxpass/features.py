@@ -932,16 +932,17 @@ all_features = [
     defenders_in_3m_radius,
     defenders_in_5m_radius,
 ]
-def player_freeze_frame_reception():
-    pass
-
 def player_freeze_frame():
     pass
 
+
 def ball_freeze_frame():
     pass 
-def ball_freeze_frame_reception():
+
+
+def gk_frame():
     pass
+
 
 def get_features(
     db: Database,
