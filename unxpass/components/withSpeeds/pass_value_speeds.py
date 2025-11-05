@@ -60,7 +60,7 @@ class PytorchSoccerMapModel(pl.LightningModule):
         # it also allows to access params with 'self.hparams' attribute
         self.save_hyperparameters()
 
-        self.model = SoccerMap(in_channels=11)
+        self.model = SoccerMap(in_channels=13)
         self.sigmoid = nn.Sigmoid()
 
         # loss function
@@ -142,32 +142,28 @@ class ToSoccerMapTensor:
         return x_bin, y_bin
 
     def __call__(self, sample):
-        start_x, start_y, end_x, end_y = (
-            sample["start_x_a0"],
-            sample["start_y_a0"],
-            sample["end_x_a0"],
-            sample["end_y_a0"],
-        )
-        frame = pd.DataFrame.from_records(sample["freeze_frame_360_a0"])
-        target = None
-        if self.label in sample:
-            target = float(sample[self.label])
+        ball_x, ball_y = (sample['ball_freeze_frame_x'], sample['ball_freeze_frame_y'])
+        ball_x_velo, ball_y_velo = (sample['ball_freeze_frame_x_velo'], sample['ball_freeze_frame_y_velo'])
+        frame= pd.DataFrame.from_records(sample['player_freeze_frame'])
+        
+        gk_x, gk_y = (sample['gk_frame_x'], sample['gk_frame_y'])
 
+        target = sample["scores_xg"]
         # Location of the player that passes the ball
         # passer_coo = frame.loc[frame.actor, ["x", "y"]].fillna(1e-10).values.reshape(-1, 2)
         # Location of the ball
-        ball_coo = np.array([[start_x, start_y]])
+        ball_coo = np.array([[ball_x, ball_y]])
         # Location of the goal
         goal_coo = np.array([[105, 34]])
         # Locations of the passing player's teammates
-        players_att_coo = frame.loc[~frame.actor & frame.teammate, ["x", "y"]].values.reshape(
+        players_att_coo = frame.loc[frame.in_possession, ["x", "y"]].values.reshape(
             -1, 2
         )
         # Locations and speed vector of the defending players
-        players_def_coo = frame.loc[~frame.teammate, ["x", "y"]].values.reshape(-1, 2)
+        players_def_coo = frame.loc[~frame.in_possession & ~frame.opp_gk, ["x", "y"]].values.reshape(-1, 2)
 
         # Output
-        matrix = np.zeros((11, self.y_bins, self.x_bins))
+        matrix = np.zeros((13, self.y_bins, self.x_bins))
 
         # CH 1: Locations of attacking team
         x_bin_att, y_bin_att = self._get_cell_indexes(
@@ -233,23 +229,26 @@ class ToSoccerMapTensor:
         #     player_in_front_of_ball & (x <= dist_ball_goal) & (dist_def_goal >= x)
         # )
         # matrix[8, :, :] = np.vectorize(outplayed2)(matrix[3, :, :])
-        players_att_vx = frame.loc[~frame.actor & frame.teammate, "x_velo"].values  # shape: (n_att_players,)
-        players_att_vy = frame.loc[~frame.actor & frame.teammate, "y_velo"].values  # shape: (n_att_players,)
+        players_att_vx = frame.loc[frame.in_possession, "x_velo"].values  # shape: (n_att_players,)
+        players_att_vy = frame.loc[frame.in_possession, "y_velo"].values  # shape: (n_att_players,)
 
         # Similarly for defending players, using the correct condition (assuming defenders are non-teammates)
-        players_def_vx = frame.loc[~frame.teammate, "x_velo"].values  # shape: (n_def_players,)
-        players_def_vy = frame.loc[~frame.teammate, "y_velo"].values 
+        players_def_vx = frame.loc[~frame.in_possession & ~frame.opp_gk, "x_velo"].values  # shape: (n_def_players,)
+        players_def_vy = frame.loc[~frame.in_possession & ~frame.opp_gk, "y_velo"].values
         # Channels 8 and 9, attacking team velocities 
-        matrix[7, y_bin_att, x_bin_att] = players_att_vx
-        matrix[8, y_bin_att, x_bin_att] = players_att_vy
+        matrix[7, y0_ball, x0_ball] = ball_x_velo
+        matrix[8, y0_ball, x0_ball] = ball_y_velo
 
         # Channel 10 & 11: Defending player velocities (x and y)
-        matrix[9, y_bin_def, x_bin_def] = players_def_vx
-        matrix[10, y_bin_def, x_bin_def] = players_def_vy
+        matrix[9, y_bin_att, x_bin_att] = players_att_vx
+        matrix[10, y_bin_att, x_bin_att] = players_att_vy
 
+        # Channel 12 & 13: Defending player velocities (x and y)
+        matrix[11, y_bin_def, x_bin_def] = players_def_vx
+        matrix[12, y_bin_def, x_bin_def] = players_def_vy
         # Mask
         mask = np.zeros((1, self.y_bins, self.x_bins))
-        end_ball_coo = np.array([[end_x, end_y]])
+        end_ball_coo = np.array([[gk_x, gk_y]])
         if np.isnan(end_ball_coo).any():
             raise ValueError("End coordinates not known.")
         x0_ball_end, y0_ball_end = self._get_cell_indexes(end_ball_coo[:, 0], end_ball_coo[:, 1])
@@ -277,12 +276,13 @@ class SoccerMapComponent(PassValueComponent, UnxPassPytorchComponent):
         super().__init__(
             model=model,
             features={
-                "startlocation": ["start_x_a0", "start_y_a0"],
-                "endlocation": ["end_x_a0", "end_y_a0"],
-                "freeze_frame_360": ["freeze_frame_360_a0"],
+                "player_freeze_frame": ["player_freeze_frame"],
+                "ball_freeze_frame": ["ball_freeze_frame_x", "ball_freeze_frame_y", 
+                                      "ball_freeze_frame_x_velo", "ball_freeze_frame_y_velo"],
+                "gk_frame": ['gk_frame_x', 'gk_frame_y'],
             },
-            label=[self.label, f"{self.label}_xg", "success"],
-            transform=ToSoccerMapTensor(dim=(68, 104), label=f"{self.label}_xg"),
+            label=[f"scores_xg"],
+            transform=ToSoccerMapTensor(dim=(68, 104), label=f"scores_xg"),
         )
 
     def initialize_dataset(self, dataset: Callable) -> PassesDataset:

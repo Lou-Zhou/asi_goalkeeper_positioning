@@ -2,7 +2,7 @@
 
 from ast import literal_eval
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable, Iterable
 import pandas as pd
 import matplotlib.pyplot as plt
 from mplsoccer import Pitch
@@ -12,7 +12,9 @@ import matplotlib.animation as animation
 from matplotlib.axes import Axes
 
 
-def get_players(game: int, metadata :  pd.DataFrame) -> tuple[list[int], list[int]]:
+def get_players(game: int, metadata :  pd.DataFrame,
+                eval_func : Callable[[str],
+                        Iterable] = literal_eval) -> tuple[list[int], list[int]]:
     """
     Cleans the players list from metadata and returns home and away player ids
 
@@ -21,6 +23,8 @@ def get_players(game: int, metadata :  pd.DataFrame) -> tuple[list[int], list[in
             The game id
         metadata: pd.DataFrame
             The metadata dataframe
+        eval_func : function
+
     Returns:
         home_players: List[int]
             List of home player ids
@@ -28,11 +32,11 @@ def get_players(game: int, metadata :  pd.DataFrame) -> tuple[list[int], list[in
             List of away player ids
     """
     game_meta = metadata[metadata['id'] == game].iloc[0]
-    players = literal_eval(game_meta['players'])
+    players = eval_func(game_meta['players'])
     home_players = [(p['id'],  p['player_role']['id'])for p in players
-                    if p['team_id'] == literal_eval(game_meta['home_team'])['id']]
+                    if p['team_id'] == eval_func(game_meta['home_team'])['id']]
     away_players = [(p['id'], p['player_role']['id']) for p in players
-                    if p['team_id'] == literal_eval(game_meta['away_team'])['id']]
+                    if p['team_id'] == eval_func(game_meta['away_team'])['id']]
     return home_players, away_players
 
 

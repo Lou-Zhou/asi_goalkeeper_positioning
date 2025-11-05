@@ -18,7 +18,7 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
             The ball freeze frame of the event
     """
     pitch = Pitch(pitch_type= "custom", pitch_length = 105, pitch_width = 68)
-    _, ax = pitch.draw()
+    fig, ax = pitch.draw()
     ff_event = ff.loc[idx]
     ball_ff_event = ball_ff.loc[idx]
 
@@ -77,6 +77,7 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
         plt_settings = {"interpolation": "bilinear"}
         surface_kwargs={**plt_settings, "vmin": None, "vmax": None, "cmap": "Greens"}
         ax.imshow(surface, extent=[0.0, 105.0, 0.0, 68.0], origin="lower", **surface_kwargs)
-    plt.legend()
-
+    ax.legend()
+    fig.tight_layout()
+    return fig
     plt.show()
