@@ -144,7 +144,8 @@ notebooks/gifs/
 *.pdf
 *.gif
 *.png
-*.txt
+.txt
+config_tree.txt
 *.csv
 lightning_logs/
 runs/git remote add origin <url>

@@ -3,6 +3,7 @@ from typing import Dict, Tuple, List
 from mplsoccer import Pitch
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
                        ball_ff : Dict[int, List[int]], surface : np.ndarray | None = None) -> None:
     """ 
@@ -75,9 +76,22 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
 
     if surface is not None:
         plt_settings = {"interpolation": "bilinear"}
-        surface_kwargs={**plt_settings, "vmin": None, "vmax": None, "cmap": "Greens"}
+
+        positive_vals = surface[surface > 0]
+        if positive_vals.size > 0:
+            vmin = np.nanmin(positive_vals)
+        else:
+            vmin = 1e-6  # fallback if everything is <= 0
+
+        vmax = np.nanmax(surface)
+
+        plt_settings = {"interpolation": "bilinear"}
+        surface_kwargs = {
+            **plt_settings,
+            "norm": LogNorm(vmin=vmin, vmax=vmax),
+            "cmap": "Greens",
+        }
         ax.imshow(surface, extent=[0.0, 105.0, 0.0, 68.0], origin="lower", **surface_kwargs)
     ax.legend()
     fig.tight_layout()
     return fig
-    plt.show()

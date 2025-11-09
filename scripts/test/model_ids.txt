@@ -1,0 +1,2 @@
+30 Epoch Value: 5d9a6f3b0d64447588577d748c8b4edf
+30 Epoch Selection: 42c1fe66e83d4f15809ed948a5c11dcb
