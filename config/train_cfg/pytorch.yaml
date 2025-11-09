@@ -7,7 +7,7 @@ trainer:
   devices: 1
 
   min_epochs: 1 # prevents early stopping
-  max_epochs: 30 #should be set to 1000 for real training(library default)
+  max_epochs: 10 #should be set to 1000 for real training(library default)
 
   # mixed precision for extra speed-up
   #precision: 16

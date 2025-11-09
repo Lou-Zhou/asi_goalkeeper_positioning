@@ -41,7 +41,7 @@ def main(config: DictConfig):
     # Train model
     logger.info("Instantiating training dataset")
     dataset_train: Callable = partial(
-        PassesDataset, path = path_data + "/Bundesliga/features/features_subset"#subset of one game of code to test, should be changed when actually running
+        PassesDataset, path = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/feats"#subset of one game of code to test, should be changed when actually running
     )
     logger.info(f"Instantiating model component <{config.component._target_}>")
     component: UnxpassComponent = hydra.utils.instantiate(config.component, _convert_="partial")
@@ -63,7 +63,11 @@ if __name__ == "__main__":
     main()
 """
 python3 run_experiment.py \
-  experiment="pass_success/soccermap" \
+  experiment="pass_selection/soccermap" \
   hparams_search="soccermap_optuna" 
 
+
+python3 run_experiment.py \
+  experiment="pass_value/soccermap" \
+  hparams_search="soccermap_optuna" 
 """

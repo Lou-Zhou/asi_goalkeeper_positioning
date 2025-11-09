@@ -148,8 +148,7 @@ notebooks/gifs/
 config_tree.txt
 *.csv
 lightning_logs/
-runs/git remote add origin <url>
 multirun/
-
+scripts/training/lightning_logs
 *.ini
 config.py
