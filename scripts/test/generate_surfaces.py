@@ -17,9 +17,10 @@ dataset_test = partial(PassesDataset, path=TEST)
 
 model_pass_value = pass_value_speeds.SoccerMapComponent(
     model=mlflow.pytorch.load_model(
-        'runs:/defbf108e95243dabd53c1f6233ef908/model', map_location='cpu'
+        'runs:/5d9a6f3b0d64447588577d748c8b4edf/model', map_location='cpu'
     )
 )
+
 surfaces = model_pass_value.predict_surface(dataset_test)
 
 ball_ff = pd.read_parquet(f"{TEST}/x_ball_freeze_frame.parquet")
@@ -30,5 +31,6 @@ with PdfPages(OUT_PDF) as pdf:
         game, frame = idx
         surface = surfaces[game][frame]
         fig = vf.plot_from_features(idx, ff, ball_ff, surface=surface)
+        fig.suptitle(f"Game {game}, Frame {frame}")
         pdf.savefig(fig, dpi=150, bbox_inches="tight")
         plt.close(fig)
