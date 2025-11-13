@@ -8,6 +8,10 @@ from tqdm import tqdm
 from matplotlib.backends.backend_pdf import PdfPages
 import pandas as pd
 import matplotlib.pyplot as plt
+#
+#git remote set-url origin https://YOUR_TOKEN_HERE@github.com/your_user/your_project.git
+
+
 
 OG_PATH = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/"
 TEST = f"{OG_PATH}/test"
