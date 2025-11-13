@@ -48,30 +48,7 @@ def main(config: DictConfig):
         **train_cfg,
     )
     logger.info("✅ Finished training.")
-
-    # ---- Make sure we return a scalar for Optuna ----
-    optimized_metric = config.get("optimized_metric")
-    if isinstance(result, dict):
-        score = float(result[optimized_metric])
-    else:
-        score = float(result)
-
-    # ---- Save params + score in this run directory ----
-    run_summary = {
-        "optimized_metric": optimized_metric,
-        "score": score,
-        "component": OmegaConf.to_container(config.component, resolve=True),
-        "train_cfg": OmegaConf.to_container(config.get("train_cfg", {}), resolve=True),
-    }
-
-    # JSON version
-    Path("run_summary.json").write_text(json.dumps(run_summary, indent=2))
-
-    # Optional: YAML version (nice for Hydra reuse)
-    summary_yaml = OmegaConf.to_yaml(OmegaConf.create(run_summary))
-    Path("run_summary.yaml").write_text(summary_yaml)
-
-    return score
+    return result
 
 
 
