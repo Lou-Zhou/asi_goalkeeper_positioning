@@ -2,62 +2,78 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
-# import dotenv
+import json
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from sdm import path_data
 
 
-# load environment variables from `.env` file if it exists
-# recursively searches for `.env` in all folders starting from work dir
-# dotenv.load_dotenv(override=True)
-
-
 @hydra.main(version_base="1.2", config_path="config/", config_name="config.yaml")
 def main(config: DictConfig):
     # Imports should be nested inside @hydra.main to optimize tab completion
-    # Read more here: https://github.com/facebookresearch/hydra/issues/934
     from unxpass import utils
     from unxpass.components.base import UnxpassComponent
     from unxpass.config import logger
     from unxpass.datasets import PassesDataset
 
-    # A couple of optional utilities:
-    # - disabling python warnings
-    # - easier access to debug mode
-    # - forcing debug friendly configuration
-    # You can safely get rid of this line if you don't want those
     utils.extras(config)
 
-    # Pretty print config using Rich library
     if config.get("print_config"):
         utils.print_config(config, resolve=True)
 
-    # Set seed
     if config.get("seed"):
         utils.set_seeds(config.seed)
 
-    # Train model
     logger.info("Instantiating training dataset")
     dataset_train: Callable = partial(
-        PassesDataset, path = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/feats"#subset of one game of code to test, should be changed when actually running
+        PassesDataset,
+        # subset of one game of code to test, should be changed when actually running
+        path="/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/test",
     )
+
     logger.info(f"Instantiating model component <{config.component._target_}>")
-    component: UnxpassComponent = hydra.utils.instantiate(config.component, _convert_="partial")
-    # Setup callbacks
+    component: UnxpassComponent = hydra.utils.instantiate(
+        config.component, _convert_="partial"
+    )
+
     train_cfg = OmegaConf.to_object(config.get("train_cfg", DictConfig({})))
     utils.instantiate_callbacks(train_cfg)
     utils.instantiate_loggers(train_cfg)
+
     logger.info("⌛ Starting training!")
-    #print(train_cfg)
-    #print(component)
     result = component.train(
-        dataset_train, optimized_metric=config.get("optimized_metric"), **train_cfg
+        dataset_train,
+        optimized_metric=config.get("optimized_metric"),
+        **train_cfg,
     )
     logger.info("✅ Finished training.")
-    return result
-import time
+
+    # ---- Make sure we return a scalar for Optuna ----
+    optimized_metric = config.get("optimized_metric")
+    if isinstance(result, dict):
+        score = float(result[optimized_metric])
+    else:
+        score = float(result)
+
+    # ---- Save params + score in this run directory ----
+    run_summary = {
+        "optimized_metric": optimized_metric,
+        "score": score,
+        "component": OmegaConf.to_container(config.component, resolve=True),
+        "train_cfg": OmegaConf.to_container(config.get("train_cfg", {}), resolve=True),
+    }
+
+    # JSON version
+    Path("run_summary.json").write_text(json.dumps(run_summary, indent=2))
+
+    # Optional: YAML version (nice for Hydra reuse)
+    summary_yaml = OmegaConf.to_yaml(OmegaConf.create(run_summary))
+    Path("run_summary.yaml").write_text(summary_yaml)
+
+    return score
+
+
 
 if __name__ == "__main__":
     main()
