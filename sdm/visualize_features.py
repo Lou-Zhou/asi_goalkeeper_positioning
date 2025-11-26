@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
-                       ball_ff : Dict[int, List[int]], surface : np.ndarray | None = None) -> None:
+                       ball_ff : Dict[int, List[int]], surface : np.ndarray | None = None, ax = None, log = False) -> None:
     """ 
     Plots an event from the raw feature set
 
@@ -19,7 +19,11 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
             The ball freeze frame of the event
     """
     pitch = Pitch(pitch_type= "custom", pitch_length = 105, pitch_width = 68)
-    fig, ax = pitch.draw()
+    if ax is None:
+        fig, ax = pitch.draw()
+    else:
+        fig = ax.figure
+        pitch.draw(ax=ax)
     ff_event = ff.loc[idx]
     ball_ff_event = ball_ff.loc[idx]
 
@@ -62,17 +66,17 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
     pitch.scatter(gk_x, gk_y, ax = ax, marker = 'o',
                 edgecolors ='red', facecolors = 'none', label='Goalkeeper', s=50)
 
-    pitch.arrows(offense_x, offense_y, offense_x_end, offense_y_end,
-                width = 2, headwidth = 5, color = 'blue', ax = ax)
+    #pitch.arrows(offense_x, offense_y, offense_x_end, offense_y_end,
+    #            width = 2, headwidth = 5, color = 'blue', ax = ax)
 
-    pitch.arrows(defense_x, defense_y, defense_x_end, defense_y_end,
-                width = 2, headwidth = 5, color = 'red', ax = ax)
+    #pitch.arrows(defense_x, defense_y, defense_x_end, defense_y_end,
+    #            width = 2, headwidth = 5, color = 'red', ax = ax)
 
-    pitch.arrows(ball_x, ball_y, ball_x + ball_x_velo,
-                 ball_y + ball_y_velo, width = 2, headwidth = 5, color = 'black', ax = ax)
+    #pitch.arrows(ball_x, ball_y, ball_x + ball_x_velo,
+    #             ball_y + ball_y_velo, width = 2, headwidth = 5, color = 'black', ax = ax)
 
-    pitch.arrows(gk_x, gk_y, gk_x_end, gk_y_end,
-                width = 2, headwidth = 5, color = 'red', ax = ax)
+    #pitch.arrows(gk_x, gk_y, gk_x_end, gk_y_end,
+    #            width = 2, headwidth = 5, color = 'red', ax = ax)
 
     if surface is not None:
         plt_settings = {"interpolation": "bilinear"}
@@ -86,11 +90,17 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
         vmax = np.nanmax(surface)
 
         plt_settings = {"interpolation": "bilinear"}
-        surface_kwargs = {
-            **plt_settings,
-            "norm": LogNorm(vmin=vmin, vmax=vmax),
-            "cmap": "Greens",
-        }
+        if log:
+            surface_kwargs = {
+                **plt_settings,
+                "norm": LogNorm(vmin=vmin, vmax=vmax),
+                "cmap": "Greens",
+            }
+        else:
+            surface_kwargs = {
+                **plt_settings,
+                "cmap": "Greens",
+            }
         ax.imshow(surface, extent=[0.0, 105.0, 0.0, 68.0], origin="lower", **surface_kwargs)
     ax.legend()
     fig.tight_layout()

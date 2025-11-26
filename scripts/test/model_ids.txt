@@ -1,2 +1,4 @@
 30 Epoch Value: 5d9a6f3b0d64447588577d748c8b4edf
 30 Epoch Selection: 42c1fe66e83d4f15809ed948a5c11dcb
+100 Epoch Value: bad65093fab94509a0a19f389c89f86e, Val MSE = 0.002553751925006509
+100 Epoch Selection: ceea16e4a0254542bccf1f953f91381b, Val logloss = 2.5773587226867676
