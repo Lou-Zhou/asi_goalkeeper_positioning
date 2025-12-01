@@ -13,7 +13,7 @@ import xgboost as xgb
 from get_diffs import generate_gk_position_surface
 
 OG_PATH = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/"
-TEST = f"{OG_PATH}/illustration"
+TEST = f"{OG_PATH}/poi"
 OUTPUT_PATH = "/home/lz80/asi_goalkeeper_positioning/stores/visualizations/"
 OUT_PDF = f"{OUTPUT_PATH}/selection_value_surfaces_poi.pdf"
 
@@ -55,7 +55,7 @@ with PdfPages(OUT_PDF) as pdf:
         axes[0].set_title("Pass Selection Surface")
 
         vf.plot_from_features(
-            idx, ff, ball_ff, surface=surf_val, ax=axes[1], log = False
+            idx, ff, ball_ff, surface=surf_val, ax=axes[1], log = False, show_max= True
         )
         axes[1].set_title("Pass Value Surface")
 

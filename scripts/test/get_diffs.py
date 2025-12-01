@@ -48,7 +48,7 @@ def generate_gk_position_surface(idx,
     full_surface = np.zeros((len(ys_full), len(xs_full)), dtype=float)
 
     goal_center_y = PITCH_WIDTH / 2.0
-    box_depth = 16.5
+    box_depth = 18
     box_width = 40.3
     half_box_width = box_width / 2.0
 
@@ -110,7 +110,7 @@ def main():
         )
     )
 
-    test = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/feats"
+    test = "/home/lz80/rdf/sp161/shared/asi_gk_pos/gk_pos_model/illustration"
 
     dataset_test = partial(PassesDataset, path=test)
 
@@ -137,7 +137,7 @@ def main():
         sel_surface = sel_surfaces[idx[0]][idx[1]]
         
         val_surface = generate_gk_position_surface(idx, value_features, ball_ff, player_ff, val_model)
-
+        best = np.min(val_surface[val_surface > 0])
         expected = np.sum(sel_surface * val_surface)
         actual = val_surface[gk_y_bin, gk_x_bin]
         diff = expected - actual #lower is worse for the gk
@@ -149,13 +149,14 @@ def main():
             "expected": expected,
             "actual": actual,
             "diff": diff,
+            "optimal" : best
         })
 
     df = pd.DataFrame(rows)
 
     df = df.set_index(["match_id", "frame"]).sort_index()
 
-    df.to_csv("/home/lz80/asi_goalkeeper_positioning/stores/frame_results.csv")
+    df.to_csv("/home/lz80/asi_goalkeeper_positioning/stores/frame_results_po.csv")
 
 if __name__ == "__main__":
     main()

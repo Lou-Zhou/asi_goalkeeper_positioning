@@ -119,7 +119,6 @@ def compute_gk_feats(ball_ff, player_ff, gk_ff):
     nearest_defender_to_gk = _safe_min(dist_to_gk[def_mask]) if dist_to_gk.size else np.nan
     
 
-    # 2) Pressure on GK
     defenders_dist_gk = dist_to_gk[def_mask] if dist_to_gk.size else np.array([])
 
     num_def_within_3m_gk = int((defenders_dist_gk <= 3.0).sum()) if defenders_dist_gk.size else 0

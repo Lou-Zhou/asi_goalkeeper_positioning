@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LogNorm
 def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
-                       ball_ff : Dict[int, List[int]], surface : np.ndarray | None = None, ax = None, log = False) -> None:
+                       ball_ff : Dict[int, List[int]], surface : np.ndarray | None = None, ax = None, log = False, show_max = False) -> None:
     """ 
     Plots an event from the raw feature set
 
@@ -102,6 +102,11 @@ def plot_from_features(idx : Tuple[str, int], ff: Dict[int, List[int]],
                 "cmap": "Greens",
             }
         ax.imshow(surface, extent=[0.0, 105.0, 0.0, 68.0], origin="lower", **surface_kwargs)
+        if show_max:
+            masked = np.where(surface > 0, surface, np.inf)
+            iy, ix = np.unravel_index(np.argmin(masked), masked.shape)
+            pitch.scatter(ix, iy, ax = ax, marker = 'o', color = 'yellow', label = 'Best Position', s = 25)
+
     ax.legend()
     fig.tight_layout()
     return fig

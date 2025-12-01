@@ -69,9 +69,9 @@ def plot_objects(pitch : Pitch, ax : Axes, tracking : pd.DataFrame,
         (image_corners['x_bottom_right'], image_corners['y_bottom_right']),
         (image_corners['x_bottom_left'], image_corners['y_bottom_left'])
     ]
-    poly = Polygon(verts, closed=True, fill=True, linewidth=2,
-                   alpha= 0.6, color = "gray", label='Camera View')
-    ax.add_patch(poly)
+    #poly = Polygon(verts, closed=True, fill=True, linewidth=2,
+    #               alpha= 0.6, color = "gray", label='Camera View')
+    #ax.add_patch(poly)
     players = literal_eval(frame_data['player_data'])
     ball = literal_eval(frame_data['ball_data'])
     possession = literal_eval(frame_data['possession'])
@@ -120,7 +120,7 @@ def plot_objects(pitch : Pitch, ax : Axes, tracking : pd.DataFrame,
     }
 
 def plot_gamestate(tracking : pd.DataFrame, frame : int,
-                   home_players: Optional[list[int]] = None) -> None:
+                   home_players: Optional[list[int]] = None, title : Optional[str] = None) -> None:
     """
     Plots a single gamestate from tracking data
 
@@ -135,8 +135,12 @@ def plot_gamestate(tracking : pd.DataFrame, frame : int,
     pitch = Pitch(pitch_type='skillcorner', pitch_length = 105, pitch_width = 68)
     _, ax = pitch.draw()
     meta = plot_objects(pitch, ax, tracking, frame, home_players)
-    plt.suptitle(f'Game State at Frame {frame}', y=1.05, fontsize=14)
-    plt.title(f'''Time {meta["timestamp"]}s, period {meta["period"]},
+    #
+    if title is not None:
+        plt.suptitle(title, y= 1.05, fontsize = 14)
+    else:
+        plt.suptitle(f'Game State at Frame {frame}', y=1.05, fontsize=14)
+        plt.title(f'''Time {meta["timestamp"]}s, period {meta["period"]},
               Possession: {meta["possession_group"]}, {meta["possession_player_id"]}''',
               fontsize=10)
     plt.legend()
