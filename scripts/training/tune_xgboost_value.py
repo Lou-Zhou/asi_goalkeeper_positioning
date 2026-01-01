@@ -6,7 +6,7 @@ import pandas as pd
 from tqdm import tqdm
 
 data = pd.read_csv("/home/lz80/asi_goalkeeper_positioning/stores/value_features.csv")
-X = data.drop(columns=['scores_xg'])
+X = data.drop(columns=['scores_xg', 'match_id', 'frame'])
 y = data['scores_xg']
 
 X_train, X_val, y_train, y_val = train_test_split(
@@ -89,13 +89,6 @@ def tune():
     best_model.save_model('/home/lz80/asi_goalkeeper_positioning/stores/model/value_model.model')
 
 def train():
-    X = data.drop(columns=['scores_xg'])
-    y = data['scores_xg']
-
-    from sklearn.model_selection import train_test_split
-    from sklearn.metrics import mean_squared_error
-    import xgboost as xgb
-
     X_train, X_val, y_train, y_val = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
@@ -109,7 +102,7 @@ def train():
         reg_lambda=1.0,
         objective="reg:squarederror",
         n_jobs=-1,
-        tree_method="hist",   # or "gpu_hist" if you have GPU
+        tree_method="hist",
     )
 
     model.fit(
@@ -124,5 +117,5 @@ def train():
     y_pred = model.predict(X_val)
     rmse = mean_squared_error(y_val, y_pred, squared=False)
     print(f"Validation RMSE: {rmse:.6f}")
-    model.save_model('/home/lz80/asi_goalkeeper_positioning/stores/model/value_model.model')
+    model.save_model('/home/lz80/asi_goalkeeper_positioning/stores/model/value_model_2.model')
 train()

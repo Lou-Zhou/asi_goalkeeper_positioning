@@ -90,7 +90,8 @@ def generate_gk_position_surface(idx,
     if not grid_points:
         return xs_full, ys_full, full_surface, pd.DataFrame()
 
-    feats_df = pd.DataFrame(grid_points)
+    feats_df = pd.DataFrame(grid_points).drop(columns=['match_id', 'frame'])
+    feats
     preds = model.predict(feats_df)
 
     for (i, j), val in zip(positions, preds):
